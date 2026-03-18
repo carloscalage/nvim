@@ -2,7 +2,7 @@
 set -euo pipefail
 
 NVIM_VERSION="v0.10.4"
-NVIM_CONFIG_REPO="git@github.com:carloscalage/nvim.git"
+NVIM_CONFIG_REPO="https://github.com/carloscalage/nvim.git"
 NVIM_CONFIG_DIR="$HOME/.config/nvim"
 NVIM_INSTALL_DIR="$HOME/.local"
 
@@ -10,7 +10,7 @@ echo "==> Installing Neovim ${NVIM_VERSION}..."
 
 # Install dependencies (build-essential for treesitter, git, etc.)
 if command -v apt-get &>/dev/null; then
-    sudo apt-get update -qq
+    sudo apt-get update -qq || true
     sudo apt-get install -y -qq git curl unzip build-essential ripgrep fd-find
 elif command -v yum &>/dev/null; then
     sudo yum install -y git curl unzip gcc gcc-c++ make ripgrep
