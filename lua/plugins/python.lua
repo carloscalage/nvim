@@ -1,52 +1,41 @@
+-- Ajustes de Python por cima do extra `lang.python` do LazyVim.
+-- O extra ja instala e configura pyright + ruff, lint e formatacao base.
+-- Aqui so ficam as minhas mudancas.
 return {
-  -- 1. Configurando o LSP (Language Server Protocol)
+  -- pyright cuida so de hover e tipagem. Diagnostico fica com o ruff.
   {
     "neovim/nvim-lspconfig",
     opts = {
-      -- A chave 'servers' é onde definimos quais linguagens queremos
       servers = {
-
-        -- Configuração do PYRIGHT (Focado em Hover e Tipagem)
         pyright = {
           settings = {
             python = {
               analysis = {
-                -- Aqui replicamos as configs do artigo para ele não reclamar de tudo
                 typeCheckingMode = "off",
-                diagnosticMode = "off", -- Desliga diagnósticos (deixa pro Ruff)
+                diagnosticMode = "off",
                 useLibraryCodeForTypes = true,
               },
             },
           },
-          -- O LazyVim permite definir chaves (keymaps) específicas para o LSP aqui, se quiser
         },
-
-        -- Configuração do RUFF (Focado em Linter e Velocidade)
+        -- ignora regras especificas do ruff sem desligar o linter
         ruff = {
-          -- Comandos para ignorar erros específicos (como no artigo)
           init_options = {
             settings = {
               args = { "--ignore", "F821", "--ignore", "E402" },
             },
           },
-          -- Aqui está o "pulo do gato" para desligar o Hover do Ruff
-          -- No LazyVim, podemos passar uma função para rodar quando o LSP liga
-          on_attach = function(client)
-            client.server_capabilities.hoverProvider = false
-          end,
         },
       },
     },
   },
 
-  -- 2. Garantir que eles sejam instalados automaticamente
-  -- O LazyVim usa o Mason, vamos garantir que ele baixe esses dois
+  -- formatacao de Python com ruff: organiza imports e formata no save
   {
-    "mason-org/mason.nvim",
+    "stevearc/conform.nvim",
     opts = {
-      ensure_installed = {
-        "pyright",
-        "ruff",
+      formatters_by_ft = {
+        python = { "ruff_organize_imports", "ruff_format" },
       },
     },
   },
