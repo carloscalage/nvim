@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NVIM_VERSION="v0.10.4"
+NVIM_VERSION="v0.12.4"
 NVIM_CONFIG_REPO="https://github.com/carloscalage/nvim.git"
 NVIM_CONFIG_DIR="$HOME/.config/nvim"
 NVIM_INSTALL_DIR="$HOME/.local"
