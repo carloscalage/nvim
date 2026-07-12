@@ -36,6 +36,22 @@ def parse(data):
     return records
 
 
+def try_nested_json(value):
+    """Se a string for JSON (objeto/lista) serializado, devolve o valor parseado."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if text[:1] not in "{[":
+        return None
+    try:
+        parsed = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if isinstance(parsed, (dict, list)):
+        return parsed
+    return None
+
+
 def scalar(value):
     if value is None:
         return "null"
@@ -66,6 +82,12 @@ def render(obj, indent, out):
 
 def render_pair(label, value, indent, out, dash=False):
     pad = "  " * indent
+    nested = try_nested_json(value)
+    if nested is not None:
+        # string que carrega JSON: expande recursivamente para leitura
+        out.append(pad + label + " (json)")
+        render(nested, indent + 1, out)
+        return
     if isinstance(value, (dict, list)) and value:
         out.append(pad + label)
         render(value, indent + 1, out)
