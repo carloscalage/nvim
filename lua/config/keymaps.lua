@@ -6,3 +6,6 @@
 -- Mantem a contagem: 5j ainda pula 5 linhas de verdade.
 vim.keymap.set({ "n", "x" }, "j", "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true })
 vim.keymap.set({ "n", "x" }, "k", "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true })
+
+-- Peek: previa legivel de datasets JSON/JSONL (ver lua/config/peek.lua)
+require("config.peek")
