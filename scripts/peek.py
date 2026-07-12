@@ -3,8 +3,8 @@
 Le JSON ou JSONL do stdin e imprime uma versao legivel para leitura qualitativa.
 
 Dois modos:
-  --mode yaml (padrao): formato tipo YAML, expande \\n em quebras reais e
-                        mantem acentuacao (nao escapa unicode). Melhor para ler texto.
+  --mode tree (padrao): arvore com conectores (├─ └─ │), expande \\n em quebras reais,
+                        expande strings que contem JSON e mantem acentuacao. Melhor para ler.
   --mode json:          JSON identado e valido (ensure_ascii=False), para trabalho estrutural.
 
 Aceita tanto um unico JSON (uma linha ou varias) quanto JSONL (um objeto por linha).
@@ -12,6 +12,13 @@ Nunca modifica o arquivo, so escreve no stdout.
 """
 import json
 import sys
+
+# conectores da arvore
+TEE = "├─ "
+ELB = "└─ "
+BAR = "│  "
+GAP = "   "
+DOT = "▪"  # marcador de item de lista que abre um bloco
 
 
 def parse(data):
@@ -59,50 +66,91 @@ def scalar(value):
         return "true"
     if value is False:
         return "false"
+    if isinstance(value, (dict, list)):  # container vazio
+        return "{}" if isinstance(value, dict) else "[]"
     return str(value)
 
 
-def render(obj, indent, out):
-    pad = "  " * indent
-    if isinstance(obj, dict):
-        if not obj:
-            out.append(pad + "{}")
-            return
-        for key, value in obj.items():
-            render_pair(str(key) + ":", value, indent, out)
-    elif isinstance(obj, list):
-        if not obj:
-            out.append(pad + "[]")
-            return
-        for value in obj:
-            render_pair("-", value, indent, out, dash=True)
-    else:
-        out.append(pad + scalar(obj))
+def is_block(value):
+    return isinstance(value, str) and "\n" in value
 
 
-def render_pair(label, value, indent, out, dash=False):
-    pad = "  " * indent
+def classify(is_key, key, value):
+    """Decide como um par (dict) ou item (lista) vira cabeca + eventual conteudo.
+
+    Retorna (head, kind, payload):
+      kind == "children" -> payload e um container a expandir
+      kind == "block"    -> payload e o texto multilinha
+      kind == "leaf"     -> head ja esta completa
+    """
+    tag = (str(key)) if is_key else DOT
     nested = try_nested_json(value)
     if nested is not None:
-        # string que carrega JSON: expande recursivamente para leitura
-        out.append(pad + label + " (json)")
-        render(nested, indent + 1, out)
-        return
+        return tag + "  (json)", "children", nested
     if isinstance(value, (dict, list)) and value:
-        out.append(pad + label)
-        render(value, indent + 1, out)
-    elif isinstance(value, str) and "\n" in value:
-        # bloco de texto multilinha: label seguido do texto identado
-        out.append(pad + label + " |")
-        for line in value.split("\n"):
-            out.append(pad + "  " + line)
+        return tag, "children", value
+    if is_block(value):
+        head = (str(key) + ": |") if is_key else DOT + " |"
+        return head, "block", value
+    if is_key:
+        return str(key) + ": " + scalar(value), "leaf", None
+    return scalar(value), "leaf", None
+
+
+def render_children(container, prefix, out):
+    if isinstance(container, dict):
+        items = list(container.items())
+        for i, (k, v) in enumerate(items):
+            render_entry(prefix, i == len(items) - 1, True, k, v, out)
     else:
-        sep = " " if dash else " "
-        out.append(pad + label + sep + scalar(value))
+        for i, v in enumerate(container):
+            render_entry(prefix, i == len(container) - 1, False, None, v, out)
+
+
+def render_entry(prefix, last, is_key, key, value, out):
+    connector = ELB if last else TEE
+    child_prefix = prefix + (GAP if last else BAR)
+    head, kind, payload = classify(is_key, key, value)
+    out.append(prefix + connector + head)
+    if kind == "children":
+        render_children(payload, child_prefix, out)
+    elif kind == "block":
+        for line in payload.split("\n"):
+            out.append(child_prefix + "  " + line)
+
+
+def render_record(record, out):
+    # nivel de topo: sem conectores, uma linha em branco entre campos
+    if isinstance(record, dict):
+        items = list(record.items())
+        for i, (k, v) in enumerate(items):
+            if i > 0:
+                out.append("")
+            render_top(str(k), v, out)
+    elif isinstance(record, list):
+        render_children(record, "", out)
+    else:
+        out.append(scalar(record))
+
+
+def render_top(key, value, out):
+    nested = try_nested_json(value)
+    if nested is not None:
+        out.append(key + "  (json)")
+        render_children(nested, "", out)
+    elif isinstance(value, (dict, list)) and value:
+        out.append(key)
+        render_children(value, "", out)
+    elif is_block(value):
+        out.append(key + ": |")
+        for line in value.split("\n"):
+            out.append("  " + line)
+    else:
+        out.append(key + ": " + scalar(value))
 
 
 def main():
-    mode = "yaml"
+    mode = "tree"
     if "--mode" in sys.argv:
         mode = sys.argv[sys.argv.index("--mode") + 1]
 
@@ -118,7 +166,7 @@ def main():
         if mode == "json":
             out.extend(json.dumps(record, indent=2, ensure_ascii=False).split("\n"))
         else:
-            render(record, 0, out)
+            render_record(record, out)
 
     sys.stdout.write("\n".join(out) + "\n")
 

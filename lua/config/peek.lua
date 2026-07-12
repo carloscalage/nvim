@@ -1,6 +1,6 @@
 -- Peek: abre uma previa legivel de JSON/JSONL num buffer scratch, sem tocar no arquivo.
 -- Util para dataset de treinamento minificado (tudo em uma linha).
---   <leader>jp  -> leitura (tipo YAML, expande \n em texto)   json: arquivo todo | jsonl: linha do cursor
+--   <leader>jp  -> leitura em arvore (expande \n e json embutido)  json: arquivo todo | jsonl: linha do cursor
 --   <leader>jP  -> JSON identado valido
 --   :Peek / :PeekJson  aceitam range (ex.: selecao visual)
 local M = {}
@@ -25,9 +25,19 @@ local function open_scratch(lines, mode)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].buftype = "nofile"
   vim.bo[buf].bufhidden = "wipe"
-  vim.bo[buf].filetype = mode == "json" and "json" or "yaml"
   vim.bo[buf].modifiable = false
   pcall(vim.api.nvim_buf_set_name, buf, "peek://" .. mode .. "/" .. counter)
+
+  if mode == "json" then
+    vim.bo[buf].filetype = "json"
+  else
+    -- arvore: sem filetype (nao e yaml valido), realce leve feito na mao
+    pcall(vim.fn.matchadd, "Comment", "[│├└─▪]") -- conectores esmaecidos
+    pcall(vim.fn.matchadd, "Special", "(json)") -- marcador de json embutido
+    pcall(vim.fn.matchadd, "Title", "^# record \\d\\+") -- separador de registros
+    pcall(vim.fn.matchadd, "Identifier", "\\v(─ |^)@<=[^ :]+:@=") -- chave antes de ':'
+  end
+
   -- q fecha a previa
   vim.keymap.set("n", "q", "<cmd>close<cr>", { buffer = buf, nowait = true, silent = true })
 end
@@ -51,14 +61,14 @@ local function smart_range()
 end
 
 vim.api.nvim_create_user_command("Peek", function(o)
-  M.peek("yaml", o.range > 0 and { o.line1, o.line2 } or smart_range())
+  M.peek("tree", o.range > 0 and { o.line1, o.line2 } or smart_range())
 end, { range = true, desc = "Peek JSON/JSONL legivel" })
 
 vim.api.nvim_create_user_command("PeekJson", function(o)
   M.peek("json", o.range > 0 and { o.line1, o.line2 } or smart_range())
 end, { range = true, desc = "Peek JSON identado" })
 
-vim.keymap.set("n", "<leader>jp", function() M.peek("yaml", smart_range()) end, { desc = "Peek legivel" })
+vim.keymap.set("n", "<leader>jp", function() M.peek("tree", smart_range()) end, { desc = "Peek legivel" })
 vim.keymap.set("x", "<leader>jp", ":Peek<cr>", { desc = "Peek legivel (selecao)" })
 vim.keymap.set("n", "<leader>jP", function() M.peek("json", smart_range()) end, { desc = "Peek JSON identado" })
 
